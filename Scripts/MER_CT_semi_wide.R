@@ -80,6 +80,6 @@ final<-final %>%
   
 # Dataout ----------------------------------------------------------------------
 
-filename<-paste("MER", Sys.Date(), "semi_wide_attributes.txt",sep="_")
+filename<-paste("MER", Sys.Date(), "semi_wide_attributes_v1.1.txt",sep="_")
 
 write_tsv(final, file.path(here("Dataout"),filename,na=""))
