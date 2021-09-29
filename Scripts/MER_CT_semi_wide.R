@@ -70,19 +70,16 @@ final<-final %>%
 
 # transform --------------------------------------------------------------------
 final<-final %>% 
-  reshape_msd("long") %>% 
-  group_by_if(is.character) %>% 
-  summarize_at(vars(value),sum,na.rm=TRUE)%>% 
+  group_by_at(vars(operatingunit:fiscal_year,source_name:focus_district)) %>% 
+  summarize_at(vars(targets:cumulative),sum,na.rm=TRUE) %>% 
   ungroup() %>% 
-  mutate(indicator2=indicator,
-         value2=value) %>% 
-  spread(indicator2,value2) %>% 
+  reshape_msd(direction="semi-wide", clean = TRUE) %>% 
   left_join(dsp_lookback,by="DSPID") 
   
   
   
 # Dataout ----------------------------------------------------------------------
 
-filename<-paste("MER", Sys.Date(), "attributes.txt",sep="_")
+filename<-paste("MER", Sys.Date(), "semi_wide_attributes.txt",sep="_")
 
 write_tsv(final, file.path(here("Dataout"),filename,na=""))
