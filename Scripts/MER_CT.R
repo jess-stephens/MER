@@ -7,6 +7,7 @@ library(glamr)
 memory.limit(size=500000)
 
 
+current_pd<-"FY21Q4i"
 
 # READ IN FILES ----------------------------------------------------------------
 ind_ref<-pull(read_excel(here("Data", "indicator_ref.xlsx"),
@@ -77,12 +78,23 @@ final<-final %>%
   mutate(indicator2=indicator,
          value2=value) %>% 
   spread(indicator2,value2) %>% 
-  left_join(dsp_lookback,by="DSPID") 
+  left_join(dsp_lookback,by="DSPID") %>% 
+  mutate(partner_other=case_when(
+    mech_code=="70301" ~ "WRHI-USAID",
+    mech_code=="70306" ~ "WRHI FSW/TG",
+    mech_code=="18483" ~ "WRHI-CDC",
+    mech_code=="80007" ~ "Wits Prevention",
+    mech_code=="17207" ~ "WRHI KP",
+    mech_code=="17038" ~ "WRHI TB/HIV",
+    mech_code=="17028" ~ "WRHI Prioity Populations",
+    TRUE ~ primepartner)
+    
+  )
   
   
   
 # Dataout ----------------------------------------------------------------------
 
-filename<-paste("MER", Sys.Date(), "attributes.txt",sep="_")
+filename<-paste(Sys.Date(),"MER_CTX",current_pd,"attributes.txt",sep="_")
 
 write_tsv(final, file.path(here("Dataout"),filename,na=""))

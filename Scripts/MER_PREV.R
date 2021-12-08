@@ -6,6 +6,7 @@ library(glamr)
 
 memory.limit(size=500000)
 
+current_pd<-"FY21Q4i"
 
 
 # READ IN FILES ----------------------------------------------------------------
@@ -94,6 +95,6 @@ final<-final %>%
   
 # Dataout ----------------------------------------------------------------------
 
-filename<-paste("MER_Prevention", Sys.Date(), "_long and wide_attributes.txt",sep="_")
+filename<-paste(Sys.Date(),"MER_Prevention",current_pd,"attributes.txt",sep="_")
 
 write_tsv(final, file.path(here("Dataout"),filename,na=""))
