@@ -15,11 +15,11 @@ ind_ref<-pull(read_excel(here("Data", "indicator_ref.xlsx"),
 
 
 #genie 
-genie_files<-list.files(here("Data"),pattern="PSNU_IM")
+genie_files<-list.files(here("Data"),pattern="SITE")
 
 genie<-here("Data",genie_files) %>% 
   map(read_msd, save_rds=FALSE, remove_txt = FALSE) %>% 
-#   reduce(rbind) %>% 
+  reduce(rbind) %>%
 #   filter(fiscal_year %in% c("2021"))
 # 
 # 
@@ -43,7 +43,8 @@ genie<-here("Data",genie_files) %>%
 
 
 final<-genie %>% 
-  filter(indicator %in% ind_ref)
+  filter(indicator %in% ind_ref,
+         fiscal_year %in% c("2021","2022"))
 
 # CONTEXT FILES IN -------------------------------------------------------------
 dsp_lookback<-read_excel(here("Data","dsp_attributes_2022-05-17.xlsx")) %>% 
@@ -99,6 +100,6 @@ final<-final %>%
   
 # Dataout ----------------------------------------------------------------------
 
-filename<-paste(Sys.Date(),"MER_CTX",current_pd,"attributes.txt",sep="_")
+filename<-paste(Sys.Date(),"MER_CTX",current_pd,"_sitelevel_attributes.txt",sep="_")
 
 write_tsv(final, file.path(here("Dataout"),filename,na=""))

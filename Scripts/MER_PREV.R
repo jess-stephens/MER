@@ -6,7 +6,7 @@ library(glamr)
 
 memory.limit(size=500000)
 
-current_pd<-"FY21Q4i"
+current_pd<-"FY22Q2c"
 
 
 # READ IN FILES ----------------------------------------------------------------
@@ -15,31 +15,31 @@ ind_ref<-pull(read_excel(here("Data", "indicator_ref.xlsx"),
 
 
 #genie 
-genie_files<-list.files(here("Data"),pattern="Genie")
+genie_files<-list.files(here("Data"),pattern="PSNU_IM")
 
-genie<-here("Data",genie_files) %>% 
-  map(read_msd, save_rds=FALSE, remove_txt = FALSE) %>% 
-  reduce(rbind) %>% 
-  filter(fiscal_year %in% c("2021"))
+# genie<-here("Data",genie_files) %>% 
+#   map(read_msd, save_rds=FALSE, remove_txt = FALSE) %>% 
+#   # reduce(rbind) %>% 
+#   # filter(fiscal_year %in% c("2021"))
 
-
+final<-read_msd(here("Data",genie_files))
 
 # MSD
-msd_files<-list.files(here("Data"),pattern="MER")
-
-msd<-here("Data",msd_files) %>% 
-  map(read_msd, save_rds=FALSE, remove_txt = FALSE) %>% 
-  reduce(rbind)
-
-
-#subset & merge ----------------------------------------------------------------
-msd<-msd %>%
-  filter(fiscal_year %in% c("2018","2019","2020"))
-
-final<-rbind(genie,msd) %>% 
-  filter(indicator %in% ind_ref)
-
-rm(genie,msd)
+# msd_files<-list.files(here("Data"),pattern="MER")
+# 
+# msd<-here("Data",msd_files) %>% 
+#   map(read_msd, save_rds=FALSE, remove_txt = FALSE) %>% 
+#   reduce(rbind)
+# 
+# 
+# #subset & merge ----------------------------------------------------------------
+# msd<-msd %>%
+#   filter(fiscal_year %in% c("2018","2019","2020"))
+# 
+# final<-rbind(genie,msd) %>% 
+#   filter(indicator %in% ind_ref)
+# 
+# rm(genie,msd)
 
 
 # CONTEXT MERGE ----------------------------------------------------------------

@@ -4,6 +4,7 @@ library(gophr)
 library(here)
 library(glamr)
 library(janitor)
+library(Wavelength)
 
 memory.limit(size=500000)
 
@@ -18,7 +19,7 @@ current_pd<-"FY21Q3"
 
 
 #genie - Read in and munge -----------------------------------------------------
-genie_files<-list.files(here("Data"),pattern="Genie")
+genie_files<-list.files(here("Data"),pattern="MER")
 
 genie<-here("Data",genie_files) %>% 
   map(read_msd, save_rds=FALSE, remove_txt = FALSE) %>% 
