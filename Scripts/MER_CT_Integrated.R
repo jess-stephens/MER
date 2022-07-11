@@ -17,7 +17,6 @@ ind_ref<-pull(read_excel(here("Data", "indicator_ref.xlsx"),
 #genie 
 genie_files<-list.files(here("Data"),pattern="PSNU_IM")
 
-
 genie<-here("Data",genie_files) %>% 
   map(read_msd, save_rds=FALSE, remove_txt = FALSE) %>% 
 #   reduce(rbind) %>% 
@@ -51,6 +50,9 @@ dsp_lookback<-read_excel(here("Data","dsp_attributes_2022-05-17.xlsx")) %>%
   rename(agency_lookback=`Agency lookback`) %>% 
   select(-MechanismID)
 
+# EPI IN -----------------------------------------------------------------------
+epi<-read_tsv(here("Data","2022-07-06_Naomi_Thembisa_processed.txt"))
+
 
 
 # CONTEXT MERGE ----------------------------------------------------------------
@@ -77,6 +79,8 @@ final<-final %>%
 # transform --------------------------------------------------------------------
 final<-final %>% 
   reshape_msd("long") %>% 
+  bind_rows(epi) %>% 
+  mutate(year=as.character(year)) %>% 
   group_by_if(is.character) %>% 
   summarize_at(vars(value),sum,na.rm=TRUE)%>% 
   ungroup() %>% 
@@ -100,9 +104,6 @@ final<-final %>%
   
 # Dataout ----------------------------------------------------------------------
 
-filename<-paste(Sys.Date(),"MER_CTX",current_pd,"attributes.txt",sep="_")
+filename<-paste(Sys.Date(),"MER_CTX_Epi_Integrated",current_pd,"attributes.txt",sep="_")
 
 write_tsv(final, file.path(here("Dataout"),filename,na=""))
-
-
-
