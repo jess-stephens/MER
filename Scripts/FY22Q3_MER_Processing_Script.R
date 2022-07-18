@@ -38,6 +38,9 @@ genie_path <- genie_folderpath %>%
 
 mfl_gid <- "1J7Jw7RuKDgS4syWlWR-OJjCv73rNVd4eJDkDU3pOxls"
 
+#use new file sent by Mabel
+mfl_new_id <- "120sDwX4_tYYVDVpbR6Lc-biPyMJO2weO-UphHcQNnrU"
+
 # msd_source <- source_info()
 # curr_pd <- source_info(genie_path, return = "period")
 # curr_fy <- source_info(genie_path, return = "fiscal_year")
@@ -56,7 +59,9 @@ hierachy <-Wavelength::pull_hierarchy(uid, datim_user(), datim_pwd())
 #Read in updated MFL
 mfl_df <- read_sheet(mfl_gid, sheet = "USAID_MFL")
 
-  #Is this only inova?
+mfl_new_df <- read_sheet(mfl_new_id)
+
+  #Is this only anova?
 
 #Q2 NDOH FILE
 df_q2 <- ndoh_folderpath %>% 
@@ -91,6 +96,8 @@ tabnames <- ndoh_filepath %>%
 #STORE NAMES --
 standard_names <- c("Province", "District", "SubDistrict", "Facility",
                     "Code")
+kp_names <- c("KP_Location", "KP_Type")
+
 names_prep_new <- c(standard_names, "Sex", "CoarseAgeGroup", "Total")
 names_prep_ct <- c(standard_names, "Sex", "CoarseAgeGroup", "Result", "Total")
 names_hts_tst <- c(standard_names, "Test Result/Outcome/Duration" ,"Sex", "CoarseAgeGroup", "HIVTestOfferedIn", "Total")
@@ -108,6 +115,16 @@ names_tb_stat_n <- c(standard_names, "Test Result/Outcome/Duration", "Sex", "Coa
 names_tx_tb_d <- c(standard_names, "Test Result/Outcome/Duration", "CoarseAgeGroup",  "Sex", "Result","Total")
 names_tx_tb_n <- c(standard_names, "Test Result/Outcome/Duration", "CoarseAgeGroup",  "Sex","Total")
 names_tb_prev <- c(standard_names, "Test Result/Outcome/Duration",  "Sex", "CoarseAgeGroup", "Total")
+
+names_prep_new_kp <- c(names_prep_new, kp_names, "Total")[-8]
+names_prep_ct_kp <- c(names_prep_ct,kp_names, "Total")[-9]
+names_hts_tst_kp <- c(names_hts_tst,kp_names, "Total")[-10]
+names_tx_new_kp <- c(names_tx_new, kp_names, "Total")[-8]
+names_tx_curr_kp <- c(names_tx_curr, kp_names, "Total")[-8]
+names_tx_ml_kp <- c(names_tx_ml,kp_names, "Total")[-9]
+names_tx_pvls_kp <- c(names_tx_pvls, kp_names, "Total")[-8]
+
+names_arvdisp <- c(standard_names, "CoarseAgeGroup", "RegimenCode", "Packs")
 
 
 #function to read all the tabs and switch names for each indic
@@ -133,7 +150,16 @@ read_all_the_things <- function(path, sheet){
                         "TX TB_D" = names_tx_tb_d,
                         "TX TB_N" = names_tx_tb_n,
                         "TB PREV_D" = names_tb_prev,
-                        "TB PREV_N" = names_tb_prev)
+                        "TB PREV_N" = names_tb_prev,
+                        "PrEP_New_KP" = names_prep_new_kp,
+                        "PrEP_CT_KP" = names_prep_ct_kp,
+                        "HTS_TST_KP" = names_hts_tst_kp,
+                        "TX_NEW_KP" = names_tx_new_kp,
+                        "TX_CURR_KP" = names_tx_curr_kp,
+                        "TX_ML_KP" = names_tx_ml_kp,
+                        "TX_PVLS_Denom_KP" = names_tx_pvls_kp,
+                        "TX_PVLS_Numer_KP" = names_tx_pvls_kp,
+                        "ARVDISP" = names_arvdisp)
   
   df <- readxl::read_excel(path, sheet, col_names = col_renamed,  col_types = "text", skip =1)
   
@@ -146,7 +172,6 @@ read_all_the_things <- function(path, sheet){
 }
 
 #Use select indicators right now as we sort out SC indicators
-  
   indic_test <- c("PrEP_New","PrEP_CT","HTS_TST", "PMTCT_EID", "TX_NEW","PMTCT_HEI_POS","PMTCT_HEI_POS_ART",
                   "TX_CURR", "TX_RTT", "TX_ML", "PMTCT_ART", "TB_ART", "TX_PVLS_Denom", "TX_PVLS_Numer",
                   "TB_STAT_Denom", "TB_STAT_Numer", "TX TB_D", "TX TB_N", "TB PREV_N", "TB PREV_D")
@@ -157,13 +182,10 @@ read_all_the_things <- function(path, sheet){
     #  stringr::str_subset("CIRG") %>%
     purrr::map_dfr(.f = ~ read_all_the_things(ndoh_filepath, sheet = .x))
   
-  
   #MUNGE NDOH AND MERGE WITH NFL- do we keep HIVTestOfferedIn?
-  
 ndoh_all <- ndoh_all %>% 
     select(Province, District, SubDistrict, Facility, Code, 
            `Test Result/Outcome/Duration`, Sex, CoarseAgeGroup, Result, Total, indicator)
-
 
 #JOIN MFL AND NDOH ---------------------------------------------------
 
@@ -173,11 +195,11 @@ orgunits <- hierachy %>%
   select(orgunit, orgunituid, countryname, snu1, psnu, psnuuid)
 
 #Reshape facility list
-df_fac <- mfl_df %>% 
+df_fac <- mfl_new_df %>% 
   filter(!is.na(OU2name)) %>% 
   janitor::clean_names() %>% 
  # select(c(1:19), starts_with("FY22")) %>% 
-  select(partner, mechanism_i_d, mechanism_uid,ou5name, ou5uid, datim_uid, ou5code, starts_with("fy22")) %>% 
+  select(ou5name, ou5uid, datim_uid, ou5code, starts_with("fy22")) %>% 
  # select(OU5name, OU5uid, OU5Code, starts_with("fy22")) %>% 
   pivot_longer(cols = starts_with("fy22"), names_to = "period", values_to = "DSD_TA") %>% 
   #view()
@@ -209,12 +231,12 @@ ndoh_all <- ndoh_all %>%
   filter(District %in% usaid_district) %>% 
   mutate(code_num = str_length(Code)) %>%
   group_by(Province, District, SubDistrict, Facility) %>% 
-  arrange(desc(code_num)) %>%
-  left_join(mfl_df %>% select(OU5name, OU5Code), by = c("Facility" = "OU5name")) %>% 
+  arrange(desc(code_num)) %>% 
+  left_join(mfl_new_df %>% select(OU5name, OU5Code), by = c("Facility" = "OU5name")) %>% 
   mutate(Code = ifelse(code_num < 6, OU5Code, Code)) %>%
   fill(Code) %>% 
   ungroup() %>% 
-# count(Facility, Code) %>% view()
+ #count(Facility, Code) %>% view()
   select(-c(code_num, OU5Code)) 
 
 
@@ -224,7 +246,7 @@ ndoh_join <- ndoh_all %>%
 
 #join NDOH to MFL
 ndoh_join2 <- df_fac %>% 
-  left_join(ndoh_all,  by = c("ou5code" = "Code")) %>% str()
+  left_join(ndoh_all,  by = c("ou5code" = "Code")) 
 
 #CHECK******
 #what facilities are in NDOH but not in MFL?
@@ -246,7 +268,6 @@ df_map_clean <- mapping_df %>%
   select(-c(Total)) 
 
 
-split <- str_split("TX_RTT (N, DSD, ARTNoContactReasonIIT/HIVStatus)", ", ") %>% unlist() %>% nth(2)
 
 #now address NDOH file numdenom stuff
 remove <- c("$_N", "$_D")
@@ -279,28 +300,44 @@ df_map_distinct <- df_map_clean %>% distinct(`Test Resuts/Outcome/Duration`, Sex
 
 ndoh_mapped <- ndoh_clean2 %>% 
   left_join(df_map_distinct, by = c("Test Result/Outcome/Duration" = "Test Resuts/Outcome/Duration",
-                                 "Sex", "CoarseAgeGroup", "Result", "indicator", "numeratordenom", "DSD_TA" = "Support Type")) %>% 
-  distinct() 
+                                 "Sex", "CoarseAgeGroup", "Result", "indicator", "numeratordenom", "DSD_TA" = "Support Type"))
   
-  # count(`Test Result/Outcome/Duration`, Sex, CoarseAgeGroup, Result,
-  #       indicator, numeratordenom, `Datim UID`) %>%
+# now pull mech codes from MSD ------------------
 
-#Figure out what is not getting mapped
+library(Wavelength)
+library(curl)
+
+mechs <- pull_mech2() #run from mech script
+
+mech_xwalk <- mechs %>% 
+  filter(operatingunit == "South Africa",
+         mech_code %in% c(70310, 70287, 81902, 70290, 70301))
+
+msd_mechs <- df_msd %>% 
+  filter(funding_agency == "USAID",
+         fiscal_year == 2022,
+         mech_code %in% c(70310, 70287, 81902, 70290, 70301)) %>% 
+  count(sitename, facilityuid, mech_code, mech_name)
+
+#join mech metadata
+ndoh_mapped <- ndoh_mapped %>% 
+  left_join(msd_mechs, by = c("datim_uid" = "facilityuid")) %>% 
+  left_join(mech_xwalk, by = c('mech_code'))
+  
+  ndoh_mapped <- ndoh_mapped %>% 
+  select(-c(mech_name.y)) %>% 
+  rename(mech_name = mech_name.x) 
+
+
+
+
+#Figure out what is not getting mapped ---
 not_mapped <- ndoh_mapped %>% 
   filter(is.na(dataElement)) %>% 
   count(`Test Result/Outcome/Duration`, Sex, CoarseAgeGroup, Result, indicator, numeratordenom, DSD_TA, dataElement)
 
 write_csv(not_mapped, "Dataout/Q3_datimuid_unmapped.csv")
 
-not_mapped %>% 
-  group_by(indicator) %>% 
-  mutate(standardizeddisaggregate = "Age/Sex/NewExistingArt/HIVStatus): TB/HIV on ART") %>% 
-  ungroup() %>% 
-  mutate(datim_uid = glue("{indicator} ({numeratordenom}, {DSD_TA},{standardizeddisaggregate}{CoarseAgeGroup}\\
-                          , {Sex}")) %>% 
-  select(datim_uid)
-
-"TB_ART (N, DSD, Age/Sex/NewExistingArt/HIVStatus): TB/HIV on ART<1, Female, Life-long ART, Already, Positive"
 
 # TO-DO -------------------------------------------------------------------------
 
@@ -309,29 +346,31 @@ not_mapped %>%
 str(ndoh_mapped)
 
 validation_file <- ndoh_mapped %>% 
-  select(period, partner, mechanism_uid, Province, District,SubDistrict, Facility, datim_uid, indicator,
+  select(period,Province, District,SubDistrict, Facility, datim_uid,
+         mech_name, mech_code, mech_uid, primepartner, indicator, numeratordenom,
          `Test Result/Outcome/Duration`, Sex, CoarseAgeGroup, Result,
          dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid, Total) %>% 
   rename(value = Total,
-         mech_uid = mechanism_uid,
+        # mech_uid = mechanism_uid,
          orgUnit_uid = datim_uid)
 
 validation_file_bmw <- ndoh_mapped %>% 
-  select(period, partner, mechanism_uid, Province, District,SubDistrict, Facility, datim_uid, indicator,
+  select(period, primepartner, mech_uid, Province, District,SubDistrict, Facility, datim_uid, indicator,
          dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid, Total) %>% 
   rename(value = Total,
-         mech_uid = mechanism_uid,
+     #    mech_uid = mechanism_uid,
          orgUnit_uid = datim_uid)
 
 
 import_file_clean <- ndoh_mapped %>% 
-  select(mechanism_uid, datim_uid, dataElement_uid, categoryOptionCombo_uid, Total) %>% 
+  select(mech_uid, datim_uid, dataElement_uid, categoryOptionCombo_uid, Total) %>% 
   rename(value = Total,
-         mech_uid = mechanism_uid,
+         #mech_uid = mechanism_uid,
          orgUnit_uid = datim_uid)
 
 write_csv(import_file_clean, "Dataout/test-q2-import-file-readyforqc.csv")
 write_csv(validation_file_bmw, "Dataout/test-q2-import-file-readyforqc-bmw.csv")
+write_csv(validation_file, "Dataout/FY22Q2_combined_import_ready-for-QC-WITHDISAGGS.csv")
 
 
 ndoh_clean2 %>% 
@@ -340,10 +379,188 @@ ndoh_clean2 %>%
 mfl_df %>% 
   count(Partner, `Mechanism I.D`)
 
+#DEAL WITH KP TABS -----------------------------------------------------
 
-# Add KP facilities but add as normal - just to make sure we get all the facilities
+#how to map dataElement and categoryoptioncombo? we will have to do manually
 
-#ARVDISP - use Given's file
+kp_indic <- c("PrEP_New_KP", "PrEP_CT_KP", "HTS_TST_KP", "TX_NEW_KP", 'TX_CURR_KP', "TX_ML_KP",
+              "TX_PVLS_Denom_KP", "TX_PVLS_Numer_KP")
+
+ndoh_kp <- kp_indic %>% 
+  #readxl::excel_sheets() %>%
+  #setdiff("meta") %>%
+  #  stringr::str_subset("CIRG") %>%
+  purrr::map_dfr(.f = ~ read_all_the_things(ndoh_filepath, sheet = .x)) %>% 
+  select(Province, District, SubDistrict, Facility, Code, 
+         `Test Result/Outcome/Duration`, Sex, CoarseAgeGroup, Result, KP_Location, KP_Type, Total, indicator)
+
+ndoh_kp <- ndoh_kp %>% 
+  filter(District %in% usaid_district) %>% 
+  mutate(code_num = str_length(Code)) %>% 
+  group_by(Province, District, SubDistrict, Facility) %>% 
+  arrange(desc(code_num)) %>%
+  left_join(mfl_new_df %>% select(OU5name, OU5Code), by = c("Facility" = "OU5name")) %>% 
+  mutate(Code = ifelse(code_num < 6, OU5Code, Code)) %>%
+  fill(Code) %>% 
+  ungroup() %>% 
+  # count(Facility, Code) %>% view()
+  select(-c(code_num, OU5Code)) 
+
+#Aggregate across KP groups
+ndoh_kp_agg <- ndoh_kp %>% 
+  group_by(Province, District, SubDistrict, Facility, Code, `Test Result/Outcome/Duration`,
+           Sex, CoarseAgeGroup, Result, indicator) %>% 
+  summarise(across(starts_with("Total"), sum, na.rm = TRUE), .groups = "drop") 
+
+
+#join NDOH to MFL
+ndoh_join_kp <- df_fac %>% 
+  left_join(ndoh_kp_agg,  by = c("ou5code" = "Code"))
+
+#CHECK******
+#what facilities are in NDOH but not in MFL?
+ndoh_kp_code <- unique(ndoh_kp$Code)
+mfl_code <- unique(df_fac$ou5code)
+setdiff(ndoh_kp_code, mfl_code)
+
+#now address NDOH file numdenom stuff
+remove <- c("$_N", "$_D")
+
+ndoh_kp_clean <- ndoh_join_kp %>% 
+  mutate(indicator = str_replace(indicator, "_KP", "")) %>%
+  mutate(indicator = recode(indicator, "PrEP_New" = "PrEP_NEW",
+                            "TX_PVLS_Denom" = "TX_PVLS_D",
+                            "TX_PVLS_Numer" = "TX_PVLS_N"),
+         numeratordenom = ifelse(str_detect(indicator, "_D"), "D", "N"),
+         CoarseAgeGroup = ifelse(indicator != "TX_CURR" & CoarseAgeGroup %in% c("50-54", "55-59", "60-64", "65+"),
+                                 "50+", CoarseAgeGroup),
+         indicator = recode(indicator,
+                            "TX_PVLS_D" = "TX_PVLS",
+                            "TX_PVLS_N" = "TX_PVLS"))
+
+#map to mapping file
+ndoh_kp_mapped <- ndoh_kp_clean %>% 
+  left_join(df_map_distinct, by = c("Test Result/Outcome/Duration" = "Test Resuts/Outcome/Duration",
+                                    "Sex", "CoarseAgeGroup", "Result", "indicator", "numeratordenom", "DSD_TA" = "Support Type"))
+
+#join mech metadata to KP data
+ndoh_kp_mapped <- ndoh_kp_mapped %>% 
+  left_join(msd_mechs, by = c("datim_uid" = "facilityuid")) %>% 
+  left_join(mech_xwalk, by = c('mech_code'))
+
+ndoh_kp_mapped <- ndoh_kp_mapped %>% 
+  select(-c(mech_name.y)) %>% 
+  rename(mech_name = mech_name.x) 
+
+#NOW SAVE VALIDATION FILE OF JUST KP
+
+kp_bmw_validation_file <- ndoh_kp_mapped %>% 
+  select(period, primepartner, mech_uid, Province, District,SubDistrict, Facility, datim_uid, indicator,
+         dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid, Total) %>% 
+  rename(value = Total,
+         #    mech_uid = mechanism_uid,
+         orgUnit_uid = datim_uid) %>% 
+  filter(!is.na(Province) & !is.na(District) & !is.na(SubDistrict)& !is.na(Facility))
+
+
+kp_validation_file <- ndoh_kp_mapped %>% 
+  select(period,Province, District,SubDistrict, Facility, datim_uid,
+         mech_name, mech_code, mech_uid, primepartner, indicator, numeratordenom,
+         `Test Result/Outcome/Duration`, Sex, CoarseAgeGroup, Result,
+         dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid, Total) %>% 
+  rename(value = Total,
+         # mech_uid = mechanism_uid,
+         orgUnit_uid = datim_uid)
+
+write_csv(kp_bmw_validation_file, "FY22Q2_import_file_KP_TABS_QC.csv")
+write_csv(kp_validation_file, "FY22Q2_import_file_KP_TABS_QC-WITHDISAGGS.csv")
+
+
+#ARVDISP - use Given's file -----------------------------------------------------
+
+#MER mapping file
+arvdisp_mapping <- data_folder %>% 
+  return_latest("RTC_DATIM MER TIER Results Consolidated_Workfile.xlsx") %>% 
+  read_xlsx(sheet= "ARVDispense")
+
+df_arvdisp <- readxl::read_excel(ndoh_filepath, sheet = "ARVDISP")
+
+#now, filter to usaid districts and pull facilities with 4 digit codes
+df_arvdisp <- df_arvdisp %>%
+  filter(District %in% usaid_district) %>%
+  mutate(code_num = str_length(Code)) %>% 
+  group_by(Province, District, Community, Facility) %>% 
+  arrange(desc(code_num)) %>%
+  left_join(mfl_new_df %>% select(OU5name, OU5Code), by = c("Facility" = "OU5name")) %>% 
+  mutate(Code = ifelse(code_num < 6, OU5Code, Code)) %>%
+  fill(Code) %>% 
+  ungroup() %>% 
+  # count(Facility, Code) %>% view()
+  select(-c(code_num, OU5Code)) %>% 
+  mutate(Code = as.character(Code))
+
+#join NDOH to MFL
+join_arvdisp <- df_fac %>% 
+  left_join(df_arvdisp,  by = c("ou5code" = "Code"))
+
+#CHECK******
+#what facilities are in NDOH but not in MFL?
+arvdisp_code <- unique(df_arvdisp$Code)
+mfl_code <- unique(df_fac$ou5code)
+setdiff(arvdisp_code, mfl_code)
+
+df_arv_clean <- join_arvdisp %>% 
+  mutate(indicator = "SC_ARVDISP",
+         RegimenCode = recode(RegimenCode, "13.0" = "13")) 
+
+  #create indicator and N/D variable in mapping file
+  arv_map_clean <- arvdisp_mapping %>% 
+    # count(`Datim UID`) %>% 
+    mutate(indicator = str_extract(dataElement, "[^ (]+")) %>% 
+    select(-c(Packs))
+
+  #now map
+  arv_map_distinct <- arv_map_clean %>% distinct(CoarseAgeGroup, RegimenCode, indicator,
+                                               dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid)
+  
+  df_arv_mapped <- df_arv_clean %>%
+    left_join(arv_map_distinct, by = c("CoarseAgeGroup", "RegimenCode", "indicator"))
+  
+ df_arv_final <-  df_arv_mapped %>% 
+  left_join(msd_mechs, by = c("datim_uid" = "facilityuid")) %>% 
+    left_join(mech_xwalk, by = c('mech_code')) %>% 
+   select(-c(mech_name.y)) %>% 
+   rename(mech_name = mech_name.x) 
+ 
+ my_arv_validation <- df_arv_final %>% 
+   select(period,Province, District, Community, Facility, datim_uid,
+          mech_name, mech_code, mech_uid, primepartner, indicator,
+          CoarseAgeGroup, RegimenCode,
+          dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid, Packs) 
+ 
+ #Add to validation files
+ 
+ arv_validaton_bmw <- df_arv_final %>% 
+   select(period, primepartner, mech_uid, Province, District,Community, Facility, datim_uid, indicator,
+          dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid, Packs) %>% 
+   rename(SubDistrict = Community,
+          value = Packs,
+          orgUnit_uid = datim_uid)
+ 
+final_validation_bmw <-  bind_rows(validation_file_bmw, arv_validaton_bmw)
+write_csv(final_validation_bmw, "FY22Q2_combined_import_QC.csv")
+ 
+ 
+arv_import <- df_arv_final %>% 
+   select(mech_uid, datim_uid, dataElement_uid, categoryOptionCombo_uid, Packs) %>% 
+   rename(value = Packs,
+          #mech_uid = mechanism_uid,
+          orgUnit_uid = datim_uid)
+
+bind_rows(import_file_clean, arv_import)
+  
+
+# ------------------------------------------------
 
 #re-do mapping with new file
 
