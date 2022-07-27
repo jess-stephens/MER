@@ -225,6 +225,8 @@ df_fac <- mfl_new_df %>%
          DSD_TA = ifelse(DSD_TA == "DSD+Roving TA", "DSD", DSD_TA)) %>% 
   rename(usaid_facility = ou5name)
 
+write_csv(df_fac, "Dataout/FY22Q3-reshaped-facility-list.csv")
+
 #check if facilities have multiple uids
 multiple_facq1 <- df_fac %>% 
   left_join(orgunits, by = c("usaid_facility" = "orgunit")) %>% 
@@ -665,7 +667,7 @@ df_arv_clean <- join_arvdisp %>%
  final_validation_Q3 <-  bind_rows(import_file_clean, import_file_clean_kp)
  final_checks_Q3 <-  bind_rows(validation_file, kp_validation_file)
  
- write_csv(final_checks_Q3, "Dataout/Partner Import Files/FY22Q3_ALL_PARTNER_import.csv.csv")
+ write_csv(final_checks_Q3, "Dataout/Partner Import Files/FY22Q3_ALL_PARTNER_import.csv")
  
  
  
