@@ -32,6 +32,8 @@ template_folderpath <- "Data/Import Files"
 genie_folderpath <- "Data/Genie"
 data_folder <- "Data/"
 
+import_out_folder <- "Data/Partner Import Files Q3"
+
 genie_path <- genie_folderpath %>% 
   return_latest("Genie_SITE_IM_South_Africa_Frozen")
 
@@ -40,6 +42,8 @@ mfl_gid <- "1J7Jw7RuKDgS4syWlWR-OJjCv73rNVd4eJDkDU3pOxls"
 
 #use new file sent by Mabel
 mfl_new_id <- "120sDwX4_tYYVDVpbR6Lc-biPyMJO2weO-UphHcQNnrU"
+
+q3_mfl_id <- '1CqzP-ibx4Ro3i7FstaPwui2q9rVVoJvUuowAlsarcJc'
 
 # msd_source <- source_info()
 # curr_pd <- source_info(genie_path, return = "period")
@@ -57,9 +61,9 @@ hierachy <-Wavelength::pull_hierarchy(uid, datim_user(), datim_pwd())
 # IMPORT ----------------------------------------------------------------
 
 #Read in updated MFL
-mfl_df <- read_sheet(mfl_gid, sheet = "USAID_MFL")
-
-mfl_new_df <- read_sheet(mfl_new_id)
+    # mfl_df <- read_sheet(mfl_gid, sheet = "USAID_MFL")
+    # mfl_new_df <- read_sheet(mfl_new_id)
+mfl_new_df <- read_sheet(q3_mfl_id)
 
   #Is this only anova?
 
@@ -67,13 +71,21 @@ mfl_new_df <- read_sheet(mfl_new_id)
 df_q2 <- ndoh_folderpath %>% 
   return_latest("MER Reporting FY22Q2_v1.2_03052022.xlsx")
 
+df_q3 <- ndoh_folderpath %>% 
+  return_latest("MER Reporting FY22Q3 v1_21072022")
+
 ndoh_filepath <- ndoh_folderpath %>%
-  return_latest("MER Reporting FY22Q2_v1.2_03052022.xlsx")  
+  return_latest("MER Reporting FY22Q3 v1_21072022.xlsx")  
 
 
 #MER mapping file
 mapping_df <- data_folder %>% 
 return_latest("MER Mapping Draft 2 62322.xlsx") %>% 
+  read_xlsx()
+
+#MER mapping file
+mapping_df <- data_folder %>% 
+  return_latest("RTC_DATIM MER TIER Results Consolidated_Workfile.xlsx") %>% 
   read_xlsx()
 
 #MER mapping file
@@ -174,7 +186,9 @@ read_all_the_things <- function(path, sheet){
 #Use select indicators right now as we sort out SC indicators
   indic_test <- c("PrEP_New","PrEP_CT","HTS_TST", "PMTCT_EID", "TX_NEW","PMTCT_HEI_POS","PMTCT_HEI_POS_ART",
                   "TX_CURR", "TX_RTT", "TX_ML", "PMTCT_ART", "TB_ART", "TX_PVLS_Denom", "TX_PVLS_Numer",
-                  "TB_STAT_Denom", "TB_STAT_Numer", "TX TB_D", "TX TB_N", "TB PREV_N", "TB PREV_D")
+                  "TB_STAT_Denom", "TB_STAT_Numer"
+                 # ,"TX TB_D", "TX TB_N", "TB PREV_N", "TB PREV_D"
+                  )
   
   ndoh_all <- indic_test %>% 
     #readxl::excel_sheets() %>%
@@ -187,6 +201,9 @@ ndoh_all <- ndoh_all %>%
     select(Province, District, SubDistrict, Facility, Code, 
            `Test Result/Outcome/Duration`, Sex, CoarseAgeGroup, Result, Total, indicator)
 
+
+
+
 #JOIN MFL AND NDOH ---------------------------------------------------
 
 #get orgunituids
@@ -194,17 +211,18 @@ orgunits <- hierachy %>%
   filter(level == 7) %>% 
   select(orgunit, orgunituid, countryname, snu1, psnu, psnuuid)
 
-#Reshape facility list
+#Reshape facility list - for Fy22Q3 list, change to account for DSD/Roving TA
 df_fac <- mfl_new_df %>% 
   filter(!is.na(OU2name)) %>% 
   janitor::clean_names() %>% 
  # select(c(1:19), starts_with("FY22")) %>% 
   select(ou5name, ou5uid, datim_uid, ou5code, starts_with("fy22")) %>% 
  # select(OU5name, OU5uid, OU5Code, starts_with("fy22")) %>% 
-  pivot_longer(cols = starts_with("fy22"), names_to = "period", values_to = "DSD_TA") %>% 
+  pivot_longer(cols = starts_with("fy22"), names_to = "period", values_to = "DSD_TA") %>%
   #view()
   mutate(period = str_sub(period, start = 1, end = 6) %>% toupper(),
-         ou5code = as.character(ou5code)) %>% 
+         ou5code = as.character(ou5code),
+         DSD_TA = ifelse(DSD_TA == "DSD+Roving TA", "DSD", DSD_TA)) %>% 
   rename(usaid_facility = ou5name)
 
 #check if facilities have multiple uids
@@ -227,13 +245,16 @@ usaid_district <- df_genie %>%
   pull(psnu)
 
 #now, filter to usaid districts and pull facilities with 4 digit codes
-ndoh_all <- ndoh_all %>% 
+ndoh_all <- ndoh_all %>%
+  mutate(District = recode(District,
+                           "fs Thabo Mofutsanyana District Municipality" = "fs Thabo Mofutsanyane District Municipality")) %>% 
   filter(District %in% usaid_district) %>% 
   mutate(code_num = str_length(Code)) %>%
   group_by(Province, District, SubDistrict, Facility) %>% 
   arrange(desc(code_num)) %>% 
   left_join(mfl_new_df %>% select(OU5name, OU5Code), by = c("Facility" = "OU5name")) %>% 
-  mutate(Code = ifelse(code_num < 6, OU5Code, Code)) %>%
+  mutate(OU5Code = as.character(OU5Code),
+    Code = ifelse(code_num < 6, OU5Code, Code)) %>%
   fill(Code) %>% 
   ungroup() %>% 
  #count(Facility, Code) %>% view()
@@ -264,8 +285,10 @@ df_map_clean <- mapping_df %>%
          numeratordenom = str_sub(numeratordenom, start= -1),
          CoarseAgeGroup = ifelse(str_detect(`Data Element`, "TX_RTT") & CoarseAgeGroup %in% c("50-54", "55-59", "60-64", "65+"),
                                  "50+", CoarseAgeGroup),
-         DSD_TA = str_split(`Datim UID`, ", ") %>% unlist() %>% nth(2)) %>% 
-  select(-c(Total)) 
+         DSD_TA = str_split(`Datim UID`, ", ") %>% unlist() %>% nth(2),
+         indicator = ifelse(indicator == "PMTCT_HEI_POS" & dataElement == "PMTCT_HEI_POS (N, DSD, Age/HIVStatus/ARTStatus): Infant Testing",
+                            "PMTCT_HEI_POS_ART", indicator)) %>% 
+  select(-c(Total))
 
 
 
@@ -294,14 +317,43 @@ ndoh_clean2 <- ndoh_join2 %>%
                             "TX_TB_N" = "TX_TB",
                             "TX_TB_D" = "TX_TB"))
 
+#address over50 disagg issue
+ ndoh_over50 <- ndoh_clean2 %>% 
+   filter(CoarseAgeGroup == "50+") %>% 
+  group_by(usaid_facility, ou5uid, datim_uid, ou5code, period, DSD_TA,
+           Province, District, SubDistrict, Facility, `Test Result/Outcome/Duration`,
+           Sex, CoarseAgeGroup, Result, indicator, numeratordenom) %>% 
+  summarise(across(starts_with("Total"), sum, na.rm = TRUE), .groups = "drop")
+ 
+ ndoh_clean2 <- ndoh_clean2 %>% 
+   filter(CoarseAgeGroup != "50+") %>% 
+   bind_rows(ndoh_over50)
+
 
 df_map_distinct <- df_map_clean %>% distinct(`Test Resuts/Outcome/Duration`, Sex, CoarseAgeGroup, Result, indicator, numeratordenom,
                                              dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid, `Support Type`)
+
+additional_map <- getwd() %>% 
+  return_latest("additional-disagg-mapping-fy22q3") %>% 
+  read_xlsx()
+
+additional_map <- additional_map %>% 
+  select(`Test Resuts/Outcome/Duration`, Sex, CoarseAgeGroup, Result, dataElement, dataElement_uid,
+         categoryOptionComboName, categoryOptionCombo_uid, DSD_TA, indicator, numeratordenom) %>% 
+  distinct() %>% 
+  rename(`Test Resuts/Outcome/Duration` = `Test Resuts/Outcome/Duration`,
+         `Support Type` = DSD_TA)
+  
+
+df_map_distinct <- df_map_distinct %>% bind_rows(additional_map)
+
 
 ndoh_mapped <- ndoh_clean2 %>% 
   left_join(df_map_distinct, by = c("Test Result/Outcome/Duration" = "Test Resuts/Outcome/Duration",
                                  "Sex", "CoarseAgeGroup", "Result", "indicator", "numeratordenom", "DSD_TA" = "Support Type"))
   
+
+
 # now pull mech codes from MSD ------------------
 
 library(Wavelength)
@@ -326,7 +378,12 @@ ndoh_mapped <- ndoh_mapped %>%
   
   ndoh_mapped <- ndoh_mapped %>% 
   select(-c(mech_name.y)) %>% 
-  rename(mech_name = mech_name.x) 
+  rename(mech_name = mech_name.x)
+  
+  #Filter NA's for District
+  
+  ndoh_mapped %>% 
+    filter(!is.na(Facility))
 
 
 
@@ -335,6 +392,29 @@ ndoh_mapped <- ndoh_mapped %>%
 not_mapped <- ndoh_mapped %>% 
   filter(is.na(dataElement)) %>% 
   count(`Test Result/Outcome/Duration`, Sex, CoarseAgeGroup, Result, indicator, numeratordenom, DSD_TA, dataElement)
+
+# DISAGG COMBOS - troubleshoot
+  #combinations msising
+  #DSD_TA missing
+  #facilities with DSD and Roving TA
+
+
+ missing_disagg2 <-  ndoh_mapped %>% 
+  filter(is.na(dataElement),
+         !is.na(District)) %>%
+  select(indicator, DSD_TA, District, Facility, Sex, CoarseAgeGroup, `Test Result/Outcome/Duration`,
+         Result, numeratordenom, dataElement)
+
+missing_disagg <- missing_disagg %>% 
+  select(indicator, Sex, CoarseAgeGroup, Result, `Test Result/Outcome/Duration`, numeratordenom, DSD_TA)
+
+
+
+fix_disagg <- ndoh_clean2 %>% distinct(indicator, Sex, CoarseAgeGroup, Result,
+                                       `Test Result/Outcome/Duration`, numeratordenom, DSD_TA) %>% 
+  semi_join(missing_disagg2) 
+
+write_csv(fix_disagg, "Dataout/FY22Q3-distinct-disagg-20220724.csv")
 
 write_csv(not_mapped, "Dataout/Q3_datimuid_unmapped.csv")
 
@@ -363,10 +443,12 @@ validation_file_bmw <- ndoh_mapped %>%
 
 
 import_file_clean <- ndoh_mapped %>% 
-  select(mech_uid, datim_uid, dataElement_uid, categoryOptionCombo_uid, Total) %>% 
+  select(mech_code, mech_uid, Facility, datim_uid, dataElement, dataElement_uid, categoryOptionCombo_uid,
+         Total, SubDistrict, District) %>% 
   rename(value = Total,
          #mech_uid = mechanism_uid,
-         orgUnit_uid = datim_uid)
+         orgUnit_uid = datim_uid,
+         orgUnitName = Facility)
 
 write_csv(import_file_clean, "Dataout/test-q2-import-file-readyforqc.csv")
 write_csv(validation_file_bmw, "Dataout/test-q2-import-file-readyforqc-bmw.csv")
@@ -400,7 +482,8 @@ ndoh_kp <- ndoh_kp %>%
   group_by(Province, District, SubDistrict, Facility) %>% 
   arrange(desc(code_num)) %>%
   left_join(mfl_new_df %>% select(OU5name, OU5Code), by = c("Facility" = "OU5name")) %>% 
-  mutate(Code = ifelse(code_num < 6, OU5Code, Code)) %>%
+  mutate(OU5Code = as.character(OU5Code),
+    Code = ifelse(code_num < 6, OU5Code, Code)) %>%
   fill(Code) %>% 
   ungroup() %>% 
   # count(Facility, Code) %>% view()
@@ -438,6 +521,18 @@ ndoh_kp_clean <- ndoh_join_kp %>%
                             "TX_PVLS_D" = "TX_PVLS",
                             "TX_PVLS_N" = "TX_PVLS"))
 
+#address over50 disagg issue
+ndoh_kp_over50 <- ndoh_kp_clean %>% 
+  filter(CoarseAgeGroup == "50+") %>% 
+  group_by(usaid_facility, ou5uid, datim_uid, ou5code, period, DSD_TA,
+           Province, District, SubDistrict, Facility, `Test Result/Outcome/Duration`,
+           Sex, CoarseAgeGroup, Result, indicator, numeratordenom) %>% 
+  summarise(across(starts_with("Total"), sum, na.rm = TRUE), .groups = "drop")
+
+ndoh_kp_clean <- ndoh_kp_clean %>% 
+  filter(CoarseAgeGroup != "50+") %>% 
+  bind_rows(ndoh_kp_over50)
+
 #map to mapping file
 ndoh_kp_mapped <- ndoh_kp_clean %>% 
   left_join(df_map_distinct, by = c("Test Result/Outcome/Duration" = "Test Resuts/Outcome/Duration",
@@ -471,6 +566,14 @@ kp_validation_file <- ndoh_kp_mapped %>%
   rename(value = Total,
          # mech_uid = mechanism_uid,
          orgUnit_uid = datim_uid)
+
+import_file_clean_kp <- ndoh_kp_mapped %>% 
+  select(mech_code, mech_uid, Facility,dataElement, datim_uid, dataElement_uid, categoryOptionCombo_uid,
+         Total, SubDistrict, District) %>% 
+  rename(value = Total,
+         #mech_uid = mechanism_uid,
+         orgUnit_uid = datim_uid,
+         orgUnitName = Facility)
 
 write_csv(kp_bmw_validation_file, "FY22Q2_import_file_KP_TABS_QC.csv")
 write_csv(kp_validation_file, "FY22Q2_import_file_KP_TABS_QC-WITHDISAGGS.csv")
@@ -526,6 +629,12 @@ df_arv_clean <- join_arvdisp %>%
   df_arv_mapped <- df_arv_clean %>%
     left_join(arv_map_distinct, by = c("CoarseAgeGroup", "RegimenCode", "indicator"))
   
+  #NOT MAPPED ---
+  arv_not_mapped <- df_arv_mapped %>% filter(is.na(dataElement), !is.na(Packs)) %>% 
+    select(indicator, DSD_TA, District, Facility, CoarseAgeGroup, RegimenCode, dataElement)
+  
+  write_csv(arv_not_mapped, "Dataout/arv-distinct-missing-disaggs.csv")
+  
  df_arv_final <-  df_arv_mapped %>% 
   left_join(msd_mechs, by = c("datim_uid" = "facilityuid")) %>% 
     left_join(mech_xwalk, by = c('mech_code')) %>% 
@@ -536,7 +645,67 @@ df_arv_clean <- join_arvdisp %>%
    select(period,Province, District, Community, Facility, datim_uid,
           mech_name, mech_code, mech_uid, primepartner, indicator,
           CoarseAgeGroup, RegimenCode,
-          dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid, Packs) 
+          dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid, Packs) %>% 
+   rename(SubDistrict = Community,
+          value = Packs,
+          orgUnit_uid = datim_uid)
+ 
+ import_file_clean_arv <- df_arv_final %>% 
+   select(mech_code, mech_uid, Facility, datim_uid, dataElement , dataElement_uid, categoryOptionCombo_uid,
+          Packs, Community, District) %>% 
+   rename(value = Packs,
+          SubDistrict = Community,
+          #mech_uid = mechanism_uid,
+          orgUnit_uid = datim_uid,
+          orgUnitName = Facility)
+ 
+# SPLIT INTO PARTNER FILES ----------------------------------------------------------------- 
+ 
+ #Exclude ARVDISP for now
+ final_validation_Q3 <-  bind_rows(import_file_clean, import_file_clean_kp)
+ final_checks_Q3 <-  bind_rows(validation_file, kp_validation_file)
+ 
+ write_csv(final_checks_Q3, "Dataout/Partner Import Files/FY22Q3_ALL_PARTNER_import.csv.csv")
+ 
+ 
+ 
+ 
+ #BROADREACH
+ FY22Q3_Broadreach_import <- final_validation_Q3 %>% 
+   filter(!is.na(dataElement)) %>% 
+   filter(mech_code == 70287)
+ 
+ #RTC
+ FY22Q3_RTC_import <- final_validation_Q3 %>% 
+   filter(!is.na(dataElement)) %>% 
+   filter(mech_code == 70290)
+ 
+ #WRHI
+ FY22Q3_WRHI_import <- final_validation_Q3 %>% 
+   filter(!is.na(dataElement)) %>% 
+   filter(mech_code == 70301)
+ 
+ #ANOVA
+ FY22Q3_ANOVA_import <- final_validation_Q3 %>% 
+   filter(!is.na(dataElement)) %>% 
+   filter(mech_code == 70310)
+ 
+ #MATCH
+ FY22Q3_MATCH_import <- final_validation_Q3 %>%
+   filter(!is.na(dataElement)) %>% 
+   filter(mech_code == 81902)
+ 
+ 
+ write_csv(FY22Q3_ANOVA_import, "Dataout/Partner Import Files/FY22Q3_ANOVA_import.csv")
+ write_csv(FY22Q3_MATCH_import, "Dataout/Partner Import Files/FY22Q3_MATCH_import.csv")
+ write_csv(FY22Q3_WRHI_import, "Dataout/Partner Import Files/FY22Q3_WRHI_import.csv")
+ write_csv(FY22Q3_RTC_import, "Dataout/Partner Import Files/FY22Q3_RTC_import.csv")
+ write_csv(FY22Q3_Broadreach_import, "Dataout/Partner Import Files/FY22Q3_BroadReach_import.csv")
+ 
+ 
+ 
+ 
+ 
  
  #Add to validation files
  
@@ -548,7 +717,6 @@ df_arv_clean <- join_arvdisp %>%
           orgUnit_uid = datim_uid)
  
 final_validation_bmw <-  bind_rows(validation_file_bmw, arv_validaton_bmw)
-write_csv(final_validation_bmw, "FY22Q2_combined_import_QC.csv")
  
  
 arv_import <- df_arv_final %>% 
