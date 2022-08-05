@@ -24,17 +24,20 @@ library(googlesheets4)
 
 # IMPORT ------------------------------------------------------------------
 
-#MSD
-#df_msd <- si_path() %>% 
- # return_latest("MER_Structured_Datasets_Site_IM_FY20-23_20220617_v2_1_South Africa") %>% 
-  #read_msd()
-
 df_msd<- read.delim("Q3 Datasets/MER_Structured_Datasets_Site_IM_FY20-23_20220617_v2_1_South Africa.txt")
 
 #facility list for MFL checks adding district and sub-district
-#df_fac <- read_csv("Dataout/FY22Q3-reshaped-facility-list.csv") #OU3 and OU4 name
-df_fac<-read_excel("Q3 Datasets/USAID_MASTER_FACILITY_LIST_FY22Q3_draft v2.xlsx", sheet="MFL")
+df_fac<-read_excel("Q3 Datasets/USAID_MASTER_FACILITY_LIST_FY22Q3_draft v3.xlsx", sheet="MFL")
 
+
+#so we have subdistricts as orgunits
+df_fac_2<-read_excel("Q3 Datasets/Additive Facility List_missingNONTIER.xlsx") 
+
+df_fac_master<-bind_rows(df_fac, df_fac_2) %>% 
+  select (`OU5name`, `OU4name`, `OU3name`, `DATIM UID`)  %>% 
+  distinct()
+  
+  
 #Aggregate final NON-TIER import files for all DSP partners
 ANOVA<-read_excel("Q3 Datasets/ANOVA _Non-Tier Import Template - FY22Q3.xlsx", sheet="import") %>% 
   mutate(primepartner = "ANOVA HEALTH INSTITUTE")
@@ -42,12 +45,14 @@ ANOVA<-read_excel("Q3 Datasets/ANOVA _Non-Tier Import Template - FY22Q3.xlsx", s
 MATCH<-read_excel("Q3 Datasets/MatCH_Non Tier Data Import Template - FY22Q3.xlsx", sheet="import") %>% 
   mutate(primepartner = "MATERNAL ADOLESCENT AND CHILD HEALTH INSTITUTE NPC")
 
-BRCH<-read_excel("Q3 Datasets/BroadReach DATIM Q3FY22 Import_File NonTIER Indicators_28072022.xlsx", sheet="import") %>% 
+#REMOVE TB_STAT BEFORE READING IN FILE
+BRCH<-read_excel("Q3 Datasets/BroadReach DATIM Q3FY22 Import_File NonTIER Indicators_28072022_revised.xlsx", sheet="import") %>% 
   mutate(primepartner = "BROADREACH HEALTHCARE (PTY) LTD")
 
 RTC<-read_excel("Q3 Datasets/RTC_NonTIER Data Import Template - FY22Q3.xlsx", sheet="import") %>%
   mutate(primepartner = "RIGHT TO CARE")
 
+#CORRECT OrgUnitNames fs Mohau Hospital and fs Tshwaraganang (Dealesville) Clinic
 WRHI_70301<-read_excel("Q3 Datasets/WRHI_70301_Non Tier Data Import File - FY22Q3.xlsx", sheet="import")%>%
   mutate(primepartner = "WITS HEALTH CONSORTIUM (PTY) LTD")
 
@@ -65,13 +70,28 @@ FY22Q3_Master_NonTier_Validations<- bind_rows(ANOVA, MATCH, BRCH, RTC, WRHI_7030
          DSD_TA = str_split(`dataElementName`, ", ") %>% unlist() %>% nth(2),
         standardizeddisaggregate = str_extract(`dataElementName`, "(?<=,)[^,]*$"))
         #File to be combined with TIER indicators      
-FY22Q3_Master_NonTier_Final<- bind_rows(ANOVA, MATCH, BRCH, RTC, WRHI_70301, WRHI_80007) %>% 
+FY22Q3_Master_NonTier_DRAFT<- bind_rows(ANOVA, MATCH, BRCH, RTC, WRHI_70301, WRHI_80007) %>% 
   mutate(`period`="2022Q3") %>% 
   select (`mech_code`: `period`) %>% 
   drop_na()
+
+FY22Q3_Master_NonTier_Final <- FY22Q3_Master_NonTier_DRAFT %>% 
+  left_join(df_fac_master, by = c("orgUnitName" = "OU5name")) %>%
+  rename("dataElement"= "dataElementName") %>% 
+  rename("SubDistrict"= "OU4name") %>%
+  rename("District"= "OU3name") %>%
+  select(mech_code, mech_uid, orgUnitName, `DATIM UID`, dataElement, dataElement_uid, categoryOptionComboName,categoryOptionCombo_uid, value) %>% 
+  rename("orgUnit_uid"= "DATIM UID") %>% 
+  distinct() %>% 
+drop_na()
+
+
+janitor::get_dupes(FY22Q3_Master_NonTier_Final)
+
+
   
 #Master NONTIER Import File
-write.csv(FY22Q3_Master_NonTier_Final, paste0("Q3_USAID_SA_Import_NonTier_", format(Sys.time(), "%d-%b-%Y"), ".csv"))
+write.csv(FY22Q3_Master_NonTier_Final, paste0("Q3_USAID_SA_Import_NonTier_revised", format(Sys.time(), "%d-%b-%Y"), ".csv"))
 
 
 # LEVEL 1 ------------------------------------------------------------------
