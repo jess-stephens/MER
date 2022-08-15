@@ -148,8 +148,52 @@ final_thembisa<-bind_rows(thembisa_ntlprov,thembisa_age_combined) %>%
   select(operatingunit,operatingunituid,country,snu1,snu1uid,
          indicator_category,indicator,standardizeddisaggregate,
          sex,ageasentered,year,period,period_type,
-         value_type,value,source_name)
+         value_type,value,source_name) %>% 
+  filter(!indicator =="HIV Incidence" | !standardizeddisaggregate =="Age/Sex",
+         !indicator =="HIV Incidence" | !standardizeddisaggregate =="Age/Sex/HIVStatus",
+         !indicator =="HIV Prevalence" | !standardizeddisaggregate =="Age/Sex",
+         !indicator =="HIV Prevalence" | !standardizeddisaggregate =="Age/Sex/HIVStatus",
+         !indicator =="Mortality Probability" | !standardizeddisaggregate =="Age/Sex",
+         !indicator =="Mortality Probability" | !standardizeddisaggregate =="Age/Sex/HIVStatus") %>% 
+  mutate(age_numeric=as.numeric(ageasentered),
+         trendscoarse=case_when(
+           ageasentered=="<15" ~ "<15",
+           ageasentered=="15+" ~ "15+",
+           indicator=="Aids Deaths (By Age Last Birthday At Start Of Year)" & age_numeric < 15 ~ "<15",
+           indicator=="Aids Deaths (By Age Last Birthday At Start Of Year)" & age_numeric >= 15 ~ "15+",
+           indicator=="Diagnosed With HIV" & age_numeric < 15 ~ "<15",
+           indicator=="Diagnosed With HIV" & age_numeric >= 15 ~ "15+",
+           indicator=="On Art" & age_numeric < 15 ~ "<15",
+           indicator=="On Art" & age_numeric >= 15 ~ "15+",
+           indicator=="Population" & age_numeric < 15 ~ "<15",
+           indicator=="Population" & age_numeric >= 15 ~ "15+",
+           indicator=="Aids Deaths (By Age Last Birthday At Start Of Year)"
+           & ageasentered %in% c("<01","01-04","05-09","10-14") ~ "<15",
+           indicator=="Aids Deaths (By Age Last Birthday At Start Of Year)"
+           & ageasentered %in% c("15-19","20-24","25-29","30-34","35-39","40-44",
+                                 "45-49","50-54","55-59","60-64","65+","50+") ~ "15+",
+           indicator=="Diagnosed With HIV" & ageasentered %in% c("<01","01-04","05-09","10-14") ~ "<15",
+           indicator=="Diagnosed With HIV" & ageasentered %in% c("15-19","20-24","25-29","30-34","35-39","40-44",
+                                                                 "45-49","50-54","55-59","60-64","65+","50+") ~ "15+",
+           indicator=="On Art" & ageasentered %in% c("<01","01-04","05-09","10-14") ~ "<15",
+           indicator=="On Art" & ageasentered %in% c("15-19","20-24","25-29","30-34","35-39","40-44",
+                                                     "45-49","50-54","55-59","60-64","65+","50+") ~ "15+",
+           indicator=="Population" & ageasentered %in% c("<01","01-04","05-09","10-14") ~ "<15",
+           indicator=="Population" & ageasentered %in% c("15-19","20-24","25-29","30-34","35-39","40-44",
+                                                         "45-49","50-54","55-59","60-64","65+","50+") ~ "15+",
+           TRUE ~ ""
+  )) %>% 
+  select(-age_numeric)
 
+
+
+check_sub<-final_thembisa %>% 
+  distinct(indicator,standardizeddisaggregate,ageasentered,trendscoarse)
+
+
+filename<-paste(Sys.Date(),"Thembisa","indicator_age.txt",sep="_")
+
+write_tsv(check_sub, file.path(here("Data"),filename,na=""))
 
 # COMBINE PROCESSED NAOMI & THEMBISA -------------------------------------------
 final<-bind_rows(epi_dp,final_thembisa)
@@ -157,7 +201,6 @@ final<-bind_rows(epi_dp,final_thembisa)
 
 # DATAOUT ----------------------------------------------------------------------
 
-# Dataout ----------------------------------------------------------------------
 
 filename<-paste(Sys.Date(),"Naomi_Thembisa","processed.txt",sep="_")
 
