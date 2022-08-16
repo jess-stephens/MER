@@ -7,7 +7,7 @@ library(glamr)
 memory.limit(size=500000)
 
 
-current_pd<-"FY22Q2c"
+current_pd<-"FY22Q3i"
 
 # READ IN FILES ----------------------------------------------------------------
 ind_ref<-pull(read_excel(here("Data", "indicator_ref.xlsx"),
@@ -15,42 +15,44 @@ ind_ref<-pull(read_excel(here("Data", "indicator_ref.xlsx"),
 
 
 #genie 
-genie_files<-list.files(here("Data"),pattern="PSNU_IM")
+genie_files<-list.files(here("Data"),pattern="Daily")
 
 
 genie<-here("Data",genie_files) %>% 
   map(read_msd, save_rds=FALSE, remove_txt = FALSE) %>% 
-#   reduce(rbind) %>% 
-#   filter(fiscal_year %in% c("2021"))
-# 
-# 
-# 
-# # MSD
-# msd_files<-list.files(here("Data"),pattern="MER")
-# 
-# msd<-here("Data",msd_files) %>% 
-#   map(read_msd, save_rds=FALSE, remove_txt = FALSE) %>% 
-#   reduce(rbind)
+  reduce(rbind) %>%
+  filter(fiscal_year %in% c("2022","2023"))
+
+print(distinct(genie,fiscal_year))
 
 
-#subset & merge ----------------------------------------------------------------
-# msd<-msd %>%
-#   filter(fiscal_year %in% c("2018","2019","2020"))
-# 
-# final<-rbind(genie,msd) %>% 
-#   filter(indicator %in% ind_ref)
-# 
-# rm(genie,msd)
+#MSD
+msd_files<-list.files(here("Data"),pattern="Frozen")
+
+msd<-here("Data",msd_files) %>%
+  map(read_msd, save_rds=FALSE, remove_txt = FALSE) %>%
+  reduce(rbind)
 
 
-final<-genie %>% 
+subset & merge ----------------------------------------------------------------
+msd<-msd %>%
+  filter(fiscal_year %in% c("2018","2019","2020","2021"))
+
+print(distinct(msd,fiscal_year))
+
+
+final<-rbind(genie,msd) %>%
   filter(indicator %in% ind_ref)
+
+rm(genie,msd)
+
+
+
 
 # CONTEXT FILES IN -------------------------------------------------------------
 dsp_lookback<-read_excel(here("Data","dsp_attributes_2022-05-17.xlsx")) %>% 
   rename(agency_lookback=`Agency lookback`) %>% 
   select(-MechanismID)
-
 
 
 # CONTEXT MERGE ----------------------------------------------------------------
@@ -92,11 +94,25 @@ final<-final %>%
     mech_code=="17207" ~ "WRHI KP",
     mech_code=="17038" ~ "WRHI TB/HIV",
     mech_code=="17028" ~ "WRHI Prioity Populations",
-    TRUE ~ prime_partner_name)
-    
-  )
+    TRUE ~ prime_partner_name))
   
-  
+
+# sense check
+data_check<-final %>% 
+  filter(standardizeddisaggregate=="Total Numerator",
+         indicator =="TX_CURR",
+         DSP=="Yes",
+         period_type %in% c("results"),
+         period %in% c("FY22Q1","FY22Q2","FY22Q3")) %>% 
+  group_by(funding_agency,indicator,period) %>% 
+  summarize_at(vars(value),sum,na.rm=TRUE) %>% 
+  ungroup() %>% 
+  spread(funding_agency,value)
+
+
+print(data_check)
+
+
   
 # Dataout ----------------------------------------------------------------------
 
