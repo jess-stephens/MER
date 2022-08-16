@@ -24,73 +24,42 @@ library(googlesheets4)
 
 # GLOBAL VARIABLES --------------------------------------------------------
 
-#site adjusted dataset
+#set folderpaths
 dsd_folderpath <- "Data/DSD TA"
 ndoh_folderpath <- "Data/NDOH Import"
 fy22files_folderpath <- "Data/Files to be added to FY22Q2 TX_RTT import"
 template_folderpath <- "Data/Import Files"
 genie_folderpath <- "Data/Genie"
 data_folder <- "Data/"
-
 import_out_folder <- "Data/Partner Import Files Q3"
+
 
 genie_path <- genie_folderpath %>% 
   return_latest("Genie_SITE_IM_South_Africa_Frozen")
 
 
-mfl_gid <- "1J7Jw7RuKDgS4syWlWR-OJjCv73rNVd4eJDkDU3pOxls"
-
-#use new file sent by Mabel
+#set google id for Master facility list
+    #mfl_gid <- "1J7Jw7RuKDgS4syWlWR-OJjCv73rNVd4eJDkDU3pOxls"
 mfl_new_id <- "1UuDYK4X-Lr8avq4IUsKGWChr17AE4Bc21MlHO3OWB-Y"
-
-q3_mfl_id <- '1CqzP-ibx4Ro3i7FstaPwui2q9rVVoJvUuowAlsarcJc'
-
-# msd_source <- source_info()
-# curr_pd <- source_info(genie_path, return = "period")
-# curr_fy <- source_info(genie_path, return = "fiscal_year")
-# curr_qtr <- source_info(genie_path, return = "quarter")
 
 # Set country of interest
 cntry <- "South Africa"
 
 # Get OU/Country orgunit uid
 uid <- get_ouuid(cntry)
-
 hierachy <-Wavelength::pull_hierarchy(uid, datim_user(), datim_pwd())
 
 # IMPORT ----------------------------------------------------------------
 
 #Read in updated MFL
-# mfl_df <- read_sheet(mfl_gid, sheet = "USAID_MFL")
-# mfl_new_df <- read_sheet(mfl_new_id)
 mfl_new_df <- read_sheet(mfl_new_id)
 
-mfl_new_df <- data_folder %>% 
-  return_latest("USAID_MASTER_FACILITY_LIST_FY22Q3_draft v3.xlsx") %>% 
-  read_xlsx()
-
-#Is this only anova?
-
-#Q2 NDOH FILE
-df_q2 <- ndoh_folderpath %>% 
-  return_latest("MER Reporting FY22Q2_v1.2_03052022.xlsx")
-
+#Q3 NDOH FILE
 df_q3 <- ndoh_folderpath %>% 
   return_latest("MER Reporting FY22Q3 v2_010822")
 
 ndoh_filepath <- ndoh_folderpath %>%
   return_latest("MER Reporting FY22Q3 v2_010822.xlsx")  
-
-
-# #MER mapping file
-# mapping_df <- data_folder %>% 
-#   return_latest("MER Mapping Draft 2 62322.xlsx") %>% 
-#   read_xlsx()
-# 
-# #MER mapping file
-# mapping_df <- data_folder %>% 
-#   return_latest("RTC_DATIM MER TIER Results Consolidated_Workfile.xlsx") %>% 
-#   read_xlsx()
 
 #MER mapping file
 mapping_df <- data_folder %>% 
@@ -98,17 +67,7 @@ mapping_df <- data_folder %>%
   read_xlsx()
 
 
-#get tab names
-tabnames <- ndoh_filepath %>% 
-  readxl::excel_sheets()
-
-# ndoh_filepath %>% 
-#   readxl::excel_sheets() %>%
-#   #setdiff("meta") %>%
-# #  stringr::str_subset("CIRG") %>%
-#   purrr::map_dfr(.f = ~ readxl::read_excel(ndoh_filepath, sheet = .x, col_types = "text"))
-
-#STORE NAMES --
+# STORE NAMES AS LOCALS ----------------------------------------------------
 standard_names <- c("Province", "District", "SubDistrict", "Facility",
                     "Code")
 kp_names <- c("KP_Location", "KP_Type")
@@ -142,7 +101,7 @@ names_tx_pvls_kp <- c(names_tx_pvls, kp_names, "Total")[-8]
 names_arvdisp <- c(standard_names, "CoarseAgeGroup", "RegimenCode", "Packs")
 
 
-#function to read all the tabs and switch names for each indic
+#function to read all the tabs and switch names for each indic ------------------
 read_all_the_things <- function(path, sheet){
   
   col_renamed <- switch(sheet,
@@ -186,19 +145,19 @@ read_all_the_things <- function(path, sheet){
   return(df)
 }
 
-#Use select indicators right now as we sort out SC indicators
+#Use select indicators TIER indicators (not ARVDISP)
 indic_test <- c("PrEP_New","PrEP_CT","TX_NEW",
                 # "HTS_TST", "PMTCT_EID",
                 # "PMTCT_HEI_POS","PMTCT_HEI_POS_ART", "PMTCT_ART",
-                "TX_CURR", "TX_RTT", "TX_ML", "TB_ART", "TX_PVLS_Denom", "TX_PVLS_Numer",
+                "TX_CURR", "TX_RTT", "TX_ML",
+                #"TB_ART",
+                "TX_PVLS_Denom", "TX_PVLS_Numer",
                 "TB_STAT_Denom", "TB_STAT_Numer"
                 # ,"TX TB_D", "TX TB_N", "TB PREV_N", "TB PREV_D"
 )
 
+#Read in TIER with new function
 ndoh_all <- indic_test %>% 
-  #readxl::excel_sheets() %>%
-  #setdiff("meta") %>%
-  #  stringr::str_subset("CIRG") %>%
   purrr::map_dfr(.f = ~ read_all_the_things(ndoh_filepath, sheet = .x))
 
 #MUNGE NDOH AND MERGE WITH NFL- do we keep HIVTestOfferedIn?
@@ -206,10 +165,7 @@ ndoh_all <- ndoh_all %>%
   select(Province, District, SubDistrict, Facility, Code, 
          `Test Result/Outcome/Duration`, Sex, CoarseAgeGroup, Result, Total, indicator)
 
-
-
-
-#JOIN MFL AND NDOH ---------------------------------------------------
+#DEAL WITH MASTER FACILITY LIST ---------------------------------------------------
 
 #get orgunituids
 orgunits <- hierachy %>% 
@@ -293,10 +249,28 @@ df_map_clean <- mapping_df %>%
                             "PMTCT_HEI_POS_ART", indicator)) %>% 
   select(-c(Total))
 
+#get distinct
+df_map_distinct <- df_map_clean %>% distinct(`Test Resuts/Outcome/Duration`, Sex, CoarseAgeGroup, Result, indicator, numeratordenom,
+                                             dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid, `Support Type`)
 
+#because mapping file is incomplete, read in additional mapping file
+additional_map <- getwd() %>% 
+  return_latest("additional-disagg-mapping-fy22q3") %>% 
+  read_xlsx()
 
-#now address NDOH file numdenom stuff
+additional_map <- additional_map %>% 
+  select(`Test Resuts/Outcome/Duration`, Sex, CoarseAgeGroup, Result, dataElement, dataElement_uid,
+         categoryOptionComboName, categoryOptionCombo_uid, DSD_TA, indicator, numeratordenom) %>% 
+  distinct() %>% 
+  rename(`Test Resuts/Outcome/Duration` = `Test Resuts/Outcome/Duration`,
+         `Support Type` = DSD_TA)
 
+#bind mapping files
+df_map_distinct <- df_map_distinct %>% bind_rows(additional_map)
+
+# MUNGE AND JOIN NDOH ------------------------------------------------
+
+#Munge and clean up NDOH names
 ndoh_clean2 <- ndoh_join2 %>%
   mutate(indicator = recode(indicator, "PrEP_New" = "PrEP_NEW",
                             "TB PREV_D" = "TB_PREV_D",
@@ -319,7 +293,7 @@ ndoh_clean2 <- ndoh_join2 %>%
                             "TX_TB_N" = "TX_TB",
                             "TX_TB_D" = "TX_TB"))
 
-#address over50 disagg issue
+#address over50 disagg issue (need to reclassify age groups above 50 as "50+")
 ndoh_over50 <- ndoh_clean2 %>% 
   filter(CoarseAgeGroup == "50+") %>% 
   group_by(usaid_facility, ou5uid, datim_uid, old_ou5code, period, DSD_TA,
@@ -332,30 +306,12 @@ ndoh_clean2 <- ndoh_clean2 %>%
   bind_rows(ndoh_over50)
 
 
-df_map_distinct <- df_map_clean %>% distinct(`Test Resuts/Outcome/Duration`, Sex, CoarseAgeGroup, Result, indicator, numeratordenom,
-                                             dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid, `Support Type`)
-
-additional_map <- getwd() %>% 
-  return_latest("additional-disagg-mapping-fy22q3") %>% 
-  read_xlsx()
-
-additional_map <- additional_map %>% 
-  select(`Test Resuts/Outcome/Duration`, Sex, CoarseAgeGroup, Result, dataElement, dataElement_uid,
-         categoryOptionComboName, categoryOptionCombo_uid, DSD_TA, indicator, numeratordenom) %>% 
-  distinct() %>% 
-  rename(`Test Resuts/Outcome/Duration` = `Test Resuts/Outcome/Duration`,
-         `Support Type` = DSD_TA)
-
-
-df_map_distinct <- df_map_distinct %>% bind_rows(additional_map)
-
-
 ndoh_mapped <- ndoh_clean2 %>% 
   filter(indicator %ni% c("PrEP_CT", "TX_RTT")) %>% 
   left_join(df_map_distinct, by = c("Test Result/Outcome/Duration" = "Test Resuts/Outcome/Duration",
                                     "Sex", "CoarseAgeGroup", "Result", "indicator", "numeratordenom", "DSD_TA" = "Support Type"))
 
-# now pull mech codes from MSD ------------------
+# now pull mech codes from MSD ----------------------------------------
 
 library(Wavelength)
 library(curl)
@@ -390,11 +346,7 @@ ndoh_mapped <- ndoh_mapped %>%
   rename(mech_name = mech_name.x)
 
 
-# DISAGG COMBOS - troubleshoot
-#combinations msising
-#DSD_TA missing
-#facilities with DSD and Roving TA
-
+#check for missing disagg maps
 missing_disagg2 <-  ndoh_mapped %>% 
   filter(is.na(dataElement),
          !is.na(District)) %>%
@@ -657,9 +609,9 @@ ndoh_kp_mapped <- ndoh_kp_mapped %>%
   left_join(msd_mechs, by = c("datim_uid" = "facilityuid")) %>% 
   left_join(mech_xwalk, by = c('mech_code'))
 
-ndoh_kp_mapped <- ndoh_kp_mapped %>% 
-  select(-c(mech_name.y)) %>% 
-  rename(mech_name = mech_name.x) 
+# ndoh_kp_mapped <- ndoh_kp_mapped %>% 
+#   select(-c(mech_name.y)) %>% 
+#   rename(mech_name = mech_name.x) 
 
 ######################################################################################################
 
@@ -748,7 +700,7 @@ kp_validation_file <- ndoh_kp_mapped %>%
          orgUnit_uid = datim_uid)
 
 import_file_clean_kp <- ndoh_kp_mapped %>% 
-  select(mech_code, mech_uid, Facility,dataElement, datim_uid, dataElement_uid, categoryOptionCombo_uid,
+  select(mech_code, mech_uid, Facility,dataElement, datim_uid, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid,
          Total, SubDistrict, District) %>% 
   rename(value = Total,
          #mech_uid = mechanism_uid,
@@ -882,35 +834,35 @@ FY22Q3_MATCH_import <- final_import_file_Q3 %>%
   filter(mech_code == 81902)
 
 
-write_csv(FY22Q3_ANOVA_import, "Dataout/Partner Import Files/FY22Q3_ANOVA_import_v2.csv")
-write_csv(FY22Q3_MATCH_import, "Dataout/Partner Import Files/FY22Q3_MATCH_import_v4.csv")
-write_csv(FY22Q3_WRHI_import, "Dataout/Partner Import Files/FY22Q3_WRHI_import_v2.csv")
-write_csv(FY22Q3_RTC_import, "Dataout/Partner Import Files/FY22Q3_RTC_import_v2.csv")
-write_csv(FY22Q3_Broadreach_import, "Dataout/Partner Import Files/FY22Q3_BroadReach_import_v2.csv")
+write_csv(FY22Q3_ANOVA_import, "Dataout/Partner Import Files/FY22Q3_ANOVA_import_FINAL.csv")
+write_csv(FY22Q3_MATCH_import, "Dataout/Partner Import Files/FY22Q3_MATCH_import_FINAL.csv")
+write_csv(FY22Q3_WRHI_import, "Dataout/Partner Import Files/FY22Q3_WRHI_import_FINAL.csv")
+write_csv(FY22Q3_RTC_import, "Dataout/Partner Import Files/FY22Q3_RTC_import_FINAL.csv")
+write_csv(FY22Q3_Broadreach_import, "Dataout/Partner Import Files/FY22Q3_BroadReach_import_FINAL.csv")
 
 
 
 
 
 
-#Add to validation files
-
-arv_validaton_bmw <- df_arv_final %>% 
-  select(period, primepartner, mech_uid, Province, District,Community, Facility, datim_uid, indicator,
-         dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid, Packs) %>% 
-  rename(SubDistrict = Community,
-         value = Packs,
-         orgUnit_uid = datim_uid)
-
-final_validation_bmw <-  bind_rows(validation_file_bmw, arv_validaton_bmw)
-
-
-arv_import <- df_arv_final %>% 
-  select(mech_uid, datim_uid, dataElement_uid, categoryOptionCombo_uid, Packs) %>% 
-  rename(value = Packs,
-         #mech_uid = mechanism_uid,
-         orgUnit_uid = datim_uid)
-
-bind_rows(import_file_clean, arv_import)
+# #Add to validation files
+# 
+# arv_validaton_bmw <- df_arv_final %>% 
+#   select(period, primepartner, mech_uid, Province, District,Community, Facility, datim_uid, indicator,
+#          dataElement, dataElement_uid, categoryOptionComboName, categoryOptionCombo_uid, Packs) %>% 
+#   rename(SubDistrict = Community,
+#          value = Packs,
+#          orgUnit_uid = datim_uid)
+# 
+# final_validation_bmw <-  bind_rows(validation_file_bmw, arv_validaton_bmw)
+# 
+# 
+# arv_import <- df_arv_final %>% 
+#   select(mech_uid, datim_uid, dataElement_uid, categoryOptionCombo_uid, Packs) %>% 
+#   rename(value = Packs,
+#          #mech_uid = mechanism_uid,
+#          orgUnit_uid = datim_uid)
+# 
+# bind_rows(import_file_clean, arv_import)
 
 
