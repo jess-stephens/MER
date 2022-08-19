@@ -59,17 +59,6 @@ WRHI_70301<-read_excel("Q3 Datasets/WRHI_70301_Non Tier Data Import File - FY22Q
 WRHI_80007<-read_excel("Q3 Datasets/WITS_RHI_Q3_80007 Data Import.xlsx", sheet="import") %>%
   dplyr::mutate(primepartner = "WITS HEALTH CONSORTIUM (PTY) LTD")
 
-#File to be used for NON-TIER checks      
-FY22Q3_Master_NonTier_Validations<- bind_rows(ANOVA, MATCH, BRCH, RTC, WRHI_70301, WRHI_80007) %>% 
-  dplyr::mutate(`period`="2022Q3") %>% 
-  drop_na() %>% 
-  #add a code that changes dataelement name to indicator
-  mutate(indicator = str_extract(`dataElementName`, "[^ (]+"),
-         numeratordenom = str_extract(`dataElementName`, "[^,]+"),
-       numeratordenom = str_extract(`numeratordenom`, "(?<=())[^()]*$"),
-         DSD_TA = str_split(`dataElementName`, ", ") %>% unlist() %>% nth(2),
-        standardizeddisaggregate = str_extract(`dataElementName`, "(?<=,)[^,]*$"))
-        #File to be combined with TIER indicators      
 FY22Q3_Master_NonTier_DRAFT<- bind_rows(ANOVA, MATCH, BRCH, RTC, WRHI_70301, WRHI_80007) %>% 
   mutate(`period`="2022Q3") %>% 
   select (`mech_code`: `period`) %>% 
@@ -85,15 +74,22 @@ FY22Q3_Master_NonTier_Final <- FY22Q3_Master_NonTier_DRAFT %>%
   distinct() %>% 
 drop_na()
 
-
 janitor::get_dupes(FY22Q3_Master_NonTier_Final)
 
-
-  
 #Master NONTIER Import File
 write.csv(FY22Q3_Master_NonTier_Final, paste0("Q3_USAID_SA_Import_NonTier_revised", format(Sys.time(), "%d-%b-%Y"), ".csv"))
 
-
+#File to be used for NON-TIER  validation checks      
+FY22Q3_Master_NonTier_Validations<- bind_rows(ANOVA, MATCH, BRCH, RTC, WRHI_70301, WRHI_80007) %>% 
+  dplyr::mutate(`period`="2022Q3") %>% 
+  drop_na() %>% 
+  #add a code that changes dataelement name to indicator
+  mutate(indicator = str_extract(`dataElementName`, "[^ (]+"),
+         numeratordenom = str_extract(`dataElementName`, "[^,]+"),
+       numeratordenom = str_extract(`numeratordenom`, "(?<=())[^()]*$"),
+         DSD_TA = str_split(`dataElementName`, ", ") %>% unlist() %>% nth(2),
+        standardizeddisaggregate = str_extract(`dataElementName`, "(?<=,)[^,]*$"))
+        #File to be combined with TIER indicators      
 # LEVEL 1 ------------------------------------------------------------------
 
 genie_validation <- df_msd %>% 
