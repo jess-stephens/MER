@@ -23,7 +23,7 @@ hrid<-read_excel(here("Data",HRID_file))
 
 
 # MUNGE ----------------------------------------------------------------
-hrid_test<-hrid %>%
+hrid<-hrid %>%
   rename(mech_code=MechanismID,
          mech_name=ImplementingMechanismName) %>% 
   mutate(mech_code=as.character(mech_code)) %>% 
@@ -92,7 +92,7 @@ dsp_lookback<-read_excel(here("Data","DSP_attributes_2022-05-17.xlsx")) %>%
 
 # BIND FILES ----------------------------------------------------------------
 
-final<-hrid_test %>% 
+final<-hrid %>% 
   unite(DSPID,mech_code,short_name,sep="",remove=FALSE) %>%  
   mutate(highburden=case_when(
     psnu=="gp City of Johannesburg Metropolitan Municipality" ~ "YES",
