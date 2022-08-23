@@ -3,64 +3,88 @@ library(readxl)
 library(gophr)
 library(here)
 library(glamr)
+library(janitor)
 
-memory.limit(size=500000)
+
+
+# REFERENCE
+current_q<-"FY22Q3"
+
+
 
 
 
 # HRID ---- MUST BE XLSX, NOT XLSB
-HRID_file<-list.files(here("Data"),pattern="HRID")
+HRID_file<-list.files(here("Data"),pattern="Factview")
 
-hrid<-read_excel(here("Data",HRID_file),
-                 sheet="data")
+hrid<-read_excel(here("Data",HRID_file))
 
-# CTC
-ctc_file<-list.files(here("Data"),pattern="CTC")
 
-ctc<-read_excel(here("Data",ctc_file),
-                sheet="RawData")
 
 
 # MUNGE ----------------------------------------------------------------
-hrid<-hrid %>%
+hrid_test<-hrid %>%
   rename(mech_code=MechanismID,
          mech_name=ImplementingMechanismName) %>% 
   mutate(mech_code=as.character(mech_code)) %>% 
-  gather(period,value,FY2017Q2:FY2021Q3) %>% 
+  gather(period,value,FY2017Q2:FY2022Q3) %>% 
+  clean_names() %>% 
   group_by_if(is.character) %>% 
   summarize(value = sum(value, na.rm = T))  %>% 
   ungroup() %>% 
   mutate(period = stringr::str_remove(period, "20")) %>% 
-  rename_with(str_to_lower) %>% 
-  select(-dsp,-dspid,-dsp_current,-siyenza,-prioritization,-highburden) %>% 
+  # rename_with(str_to_lower) %>% 
+  # select(-dsp,-dspid,-dsp_current,-siyenza,-prioritization,-highburden) %>% 
   mutate(short_name=psnu,
          short_name=str_replace_all(short_name, "District Municipality","DM"),
-         short_name=str_replace_all(short_name, "Metropolitan Municipality", "MM")) 
-
-ctc<-ctc %>% 
-  rename_with(str_to_lower) %>% 
-  rename(fundingagency=agency,
-         mech_code=`mechanism id`,
-         mech_name=mechanismname,
-         snu1=province,
-         community=`sub-district`,
-         cadre=`disaggregate cadre`,
-         occ_classification=`occupational classification`,
-         service_delivery_model=`service delivery model`,
-         period=yearquarter,
-         value_type=valuetype,
-         last_refreshed=lastrefreshed,
-         value=`sum of value`) %>% 
-  mutate(period = stringr::str_remove(period, "20")) %>% 
-  mutate(short_name=psnu,
-         short_name=str_replace_all(short_name, "District Municipality","DM"),
-         short_name=str_replace_all(short_name, "Metropolitan Municipality", "MM"),
-         indicator="CTC") 
+         short_name=str_replace_all(short_name, "Metropolitan Municipality", "MM")) %>% 
+  rename(occ_classification=disaggregate,
+         cadre=category_option_combo_name,
+         service_delivery_model=other_disaggregate,
+         snuprioritization=psnu_priority) %>% 
+  mutate(CHW_like = case_when(occ_classification=="Community Development Workers"& service_delivery_model=="Community-based" ~ "Yes",
+                              occ_classification=="Community Development Workers"& service_delivery_model=="Facility site - Roving" ~ "Yes",
+                              occ_classification=="Community Development Workers"& service_delivery_model=="Facility site - Seconded" ~ "Yes",
+                              occ_classification=="Community Development Workers"& service_delivery_model=="Facility site - Surge" ~ "Yes",
+                              occ_classification=="Community Development Workers"& service_delivery_model=="Ward Based Outreach Team - WBOT" ~ "Yes",
+                              occ_classification=="Community health workers"& service_delivery_model=="Community-based" ~ "Yes",
+                              occ_classification=="Community health workers"& service_delivery_model=="Facility site - Roving" ~ "Yes",
+                              occ_classification=="Community health workers"& service_delivery_model=="Facility site - Seconded" ~ "Yes",
+                              occ_classification=="Community health workers"& service_delivery_model=="Facility site - Surge" ~ "Yes",
+                              occ_classification=="Community health workers"& service_delivery_model=="Ward Based Outreach Team - WBOT" ~ "Yes",
+                              occ_classification=="Community navigator"& service_delivery_model=="Community-based" ~ "Yes",
+                              occ_classification=="Community navigator"& service_delivery_model=="Facility site - Roving" ~ "Yes",
+                              occ_classification=="Community navigator"& service_delivery_model=="Facility site - Seconded" ~ "Yes",
+                              occ_classification=="Community navigator"& service_delivery_model=="Facility site - Surge" ~ "Yes",
+                              occ_classification=="Community navigator"& service_delivery_model=="Ward Based Outreach Team - WBOT" ~ "Yes",
+                              occ_classification=="Mentor Mothers"& service_delivery_model=="Community-based" ~ "Yes",
+                              occ_classification=="Mentor Mothers"& service_delivery_model=="Facility site - Roving" ~ "Yes",
+                              occ_classification=="Mentor Mothers"& service_delivery_model=="Facility site - Seconded" ~ "Yes",
+                              occ_classification=="Mentor Mothers"& service_delivery_model=="Facility site - Surge" ~ "Yes",
+                              occ_classification=="Mentor Mothers"& service_delivery_model=="Ward Based Outreach Team - WBOT" ~ "Yes",
+                              occ_classification=="Outreach Team Leader - OTL"& service_delivery_model=="Community-based" ~ "Yes",
+                              occ_classification=="Outreach Team Leader - OTL"& service_delivery_model=="Facility site - Roving" ~ "Yes",
+                              occ_classification=="Outreach Team Leader - OTL"& service_delivery_model=="Facility site - Seconded" ~ "Yes",
+                              occ_classification=="Outreach Team Leader - OTL"& service_delivery_model=="Facility site - Surge" ~ "Yes",
+                              occ_classification=="Outreach Team Leader - OTL"& service_delivery_model=="Ward Based Outreach Team - WBOT" ~ "Yes",
+                              occ_classification=="Lay Counselors"& service_delivery_model=="Community-based" ~ "Yes",
+                              occ_classification=="Lay Counselors"& service_delivery_model=="Ward Based Outreach Team - WBOT" ~ "Yes",
+                              occ_classification=="Linkage Officer"& service_delivery_model=="Community-based" ~ "Yes",
+                              occ_classification=="Linkage Officer"& service_delivery_model=="Ward Based Outreach Team - WBOT" ~ "Yes",
+                              occ_classification=="Personal Care Workers"& service_delivery_model=="Community-based" ~ "Yes",
+                              occ_classification=="Personal Care Workers"& service_delivery_model=="Ward Based Outreach Team - WBOT" ~ "Yes",
+                              occ_classification=="Social Work and related professionals"& service_delivery_model=="Community-based" ~ "Yes",
+                              occ_classification=="Social Work and related professionals"& service_delivery_model=="Ward Based Outreach Team - WBOT" ~ "Yes",
+                              occ_classification=="Youth workers"& service_delivery_model=="Community-based" ~ "Yes",
+                              occ_classification=="Youth workers"& service_delivery_model=="Ward Based Outreach Team - WBOT" ~ "Yes",
+                              occ_classification=="WBOT OTL" ~ "Yes",
+                              occ_classification=="WBOT CHW" ~ "Yes",
+                              TRUE ~ "No"))
 
   
   
 # CONTEXT FILES IN -------------------------------------------------------------
-dsp_lookback<-read_tsv(here("Data","DSP_attributes_2021-02-08.txt")) %>% 
+dsp_lookback<-read_excel(here("Data","DSP_attributes_2022-05-17.xlsx")) %>% 
   rename(agency_lookback=`Agency lookback`) %>% 
   select(-MechanismID)
 
@@ -68,7 +92,7 @@ dsp_lookback<-read_tsv(here("Data","DSP_attributes_2021-02-08.txt")) %>%
 
 # BIND FILES ----------------------------------------------------------------
 
-final<-bind_rows(hrid,ctc) %>% 
+final<-hrid_test %>% 
   unite(DSPID,mech_code,short_name,sep="",remove=FALSE) %>%  
   mutate(highburden=case_when(
     psnu=="gp City of Johannesburg Metropolitan Municipality" ~ "YES",
@@ -100,6 +124,6 @@ final<-final %>%
   
 # Dataout ----------------------------------------------------------------------
 
-filename<-paste(Sys.Date(), "FY21Q3_HRID_CTC_attributes.txt",sep="_")
+filename<-paste(Sys.Date(), current_q, "HRID_CTC_attributes.txt",sep="_")
 
-write_tsv(final, file.path(here("Dataout"),filename,na=""))
+write_tsv(final, file.path(here("Dataout"),filename),na="")
