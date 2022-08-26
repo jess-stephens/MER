@@ -1,1 +1,86 @@
+# PROJECT:  SA-SI-MER- Validating MFL with MSD
+# AUTHOR:   Vanessa Da Costa| USAID
+# PURPOSE:  To make sure all USAIDs facilities are accounted for in the Master Facility List (MFL)
+# LICENSE:  MIT
+# DATE:   2022-08-26
+# UPDATED: 2022-08-XX
+# NOTE: Make sure the most updated MFL and MSD are read into the script 
+
+
+# DEPENDENCIES ------------------------------------------------------------
+
+library(tidyverse)
+library(glitr)
+library(glamr)
+library(gophr)
+library(extrafont)
+library(scales)
+library(tidytext)
+library(patchwork)
+library(ggtext)
+library(glue)
+library(readxl)
+library(googlesheets4)
+library(janitor)
+library(validate)
+
+
+#Make sure your R Profile has the SI folder paths stored so you can connect to DATIM for the automated option
+set_email("vdacosta@usaid.gov") #CHANGE TO YOUR EMAIL ADDRESS
+load_secrets()
+#after this step copy and paste into the R profile script and save
+drive_auth()
+gs4_auth
+glamr::set_paths()
+
+# IMPORT ------------------------------------------------------------------
+#Import South Africa's MSD (MAKE SURE IT'S THE MOST UPDATED ONE)
+  #Manual- 
+      #1.go to https://pepfar-panorama.org/ and navigate to the green download arrow in top right of screen
+      #2 then go to the 'MER FYXXX QX folder' (most updated data folder)
+      #3 then go to the 'Site Level' folder
+      #4 then download the and unzip file, and save it in your working directory folder
+      #5 edit the file name below to match
+setwd("~/R/South Africa")
+df_msd <-read.delim("MSD/MER_Structured_Datasets_Site_IM_FY20-23_20220812_v1_1_South Africa.txt")
+
+df_msd_compare <-df_msd%>%  
+      filter(funding_agency == "USAID") %>% 
+      select (`sitename`,`orgunituid`) %>% 
+      distinct()
+  
+  #Automated
+      #1 connect to DATIM automatically
+      #2 edit the file name below to match
+  df_msd <- si_path() %>% 
+    return_latest("MSD/MER_Structured_Datasets_Site_IM_FY20-23_20220812_v1_1_South Africa")%>% 
+    read_msd() %>% 
+    filter(funding_agency == "USAID") %>% 
+    select (`sitename`,`facilityuid`) %>% 
+    distinct()# so that there's only one row per facility/facility uid combination
+  
+  
+  #Import USAID South Africa's Master Facility List (MAKE SURE IT'S THE MOST UPDATED ONE) 
+  df_fac<-read_excel("Q3 Datasets/USAID_MASTER_FACILITY_LIST_FY22Q3_draft v3.xlsx", sheet="MFL") %>% 
+    select (`OU5name`,`DATIM UID`)
+
+# JOIN MFL and MSD ------------------------------------------------------------------
+  
+df_compare <-df_msd_compare %>% 
+  full_join(df_fac, by = c("sitename" = "OU5name"),("orgunituid"="DATIM UID"))
+ 
+# CHECK FOR DUPLICATES ------------------------------------------------------------------
+    
+janitor::get_dupes(df_compare)
+  
+#VALIDATION REPORT----------------------------------------------------
+  rules <- validator(
+    !is.na(orgunituid)
+    , !is.na(`DATIM UID`)
+  )
+  out <- confront(df_compare, rules)
+  summary(out)
+
+#Master joined MFL and MSD File
+write.csv(df_compare, paste0("df_compare_MFL_MSD", format(Sys.time(), "%d-%b-%Y"), ".csv"))
 
