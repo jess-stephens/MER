@@ -52,11 +52,11 @@ df_msd_compare <-df_msd%>%
   #Automated
       #1 connect to DATIM automatically
       #2 edit the file name below to match
-  df_msd <- si_path() %>% 
+  df_msd_compare <- si_path() %>% 
     return_latest("MSD/MER_Structured_Datasets_Site_IM_FY20-23_20220812_v1_1_South Africa")%>% 
     read_msd() %>% 
     filter(funding_agency == "USAID") %>% 
-    select (`sitename`,`facilityuid`) %>% 
+    select (`sitename`,`orgunituid`) %>% 
     distinct()# so that there's only one row per facility/facility uid combination
   
   
