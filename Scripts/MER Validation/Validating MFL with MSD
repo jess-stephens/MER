@@ -57,12 +57,12 @@ df_msd_compare <-df_msd%>%
     read_msd() %>% 
     filter(funding_agency == "USAID") %>% 
     select (`sitename`,`orgunituid`) %>% 
-    distinct()# so that there's only one row per facility/facility uid combination
+    distinct()# so that there's only one row per facility/orgunituid uid combination
   
   
   #Import USAID South Africa's Master Facility List (MAKE SURE IT'S THE MOST UPDATED ONE) 
   df_fac<-read_excel("Q3 Datasets/USAID_MASTER_FACILITY_LIST_FY22Q3_draft v3.xlsx", sheet="MFL") %>% 
-    select (`OU5name`,`DATIM UID`)
+    select (`OU5name`,`DATIM UID`) #or change this to whatever the orgunit and DATIM UID is in the updated MFL
 
 # JOIN MFL and MSD ------------------------------------------------------------------
   
