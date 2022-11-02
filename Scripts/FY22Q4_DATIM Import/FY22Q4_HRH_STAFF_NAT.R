@@ -31,7 +31,7 @@
 
   # SI specific paths/functions
     load_secrets()
-    folderpath <- "data-raw/q4_prep"
+    folderpath <- "C:/Users/jstephens/Documents/South Africa/DMR/MER/MER/Data/q4_prep"
 
   #HRH_STAFF_NAT data on google drive
   g_id <- "1JnyR4W2pC_JMPWGvYWNcZHYgHL1Gh8PQZxZfdeVWfGc"
@@ -40,7 +40,7 @@
 
   #misaligned facility names
   df_misaligned <-  folderpath %>%
-    return_latest() %>%
+    return_latest("alignment") %>%
     readxl::read_excel()
 
   #import data
@@ -85,8 +85,12 @@
 
 # MECHS ----------------------------------------------------------------------
 
-  mechs <- glamr::si_path() %>%
+  mechs <-
+    folderpath %>%
     glamr::return_latest("mechs") %>%
+    # readxl::read_excel()
+    # glamr::si_path() %>%
+    # glamr::return_latest("mechs") %>%
     readr::read_csv() %>%
     dplyr::mutate(mech_code = as.character(mech_code)) %>%
     filter(operatingunit == "South Africa",
@@ -101,7 +105,8 @@ df_clean <- df %>%
                  names_to = "indicator",
                  values_to = "value") %>%
     left_join(df_cat, by = "indicator") %>%
-    mutate(OrgUnit = str_replace(OrgUnit, "clinic", "Clinic"))
+    mutate(OrgUnit = str_replace(OrgUnit, "clinic", "Clinic")) %>% 
+    filter(!str_detect(indicator, 'FTE'))
 
 df_clean <- df_clean %>%
   left_join(df_misaligned %>% filter(!is.na(`MFL_contenders (FY22Q4)`)),by = c("OrgUnit" = "HRH_Facility_Name")) %>%
@@ -132,7 +137,10 @@ df_mapped <- df_clean %>%
 # dataElementuid ----------------------------------------------------
 
 #Read in mapping file from google drive - map in datim element and catoptioncombo
+# df_map_distinct <- googlesheets4::read_sheet(disagg_map_id, sheet = "HRH_STAFF_NAT")
+disagg_map_id <- "1IJpv6rA2JTz7dt2HdoRSy_Ulo1hzow_xMBgBKcN3Fzs"
 df_map_distinct <- googlesheets4::read_sheet(disagg_map_id, sheet = "HRH_STAFF_NAT")
+
 
 df_final <- df_mapped %>%
   mutate(cat = recode(cat, "Other Health Care Workers (HCW)" = "Other",
@@ -148,4 +156,21 @@ df_final <- df_mapped %>%
 
 # EXPORT -------------------------------------------------------------------
 
-write_csv(df_final, "data-raw/q4_prep/FY22Q4_HRH_STAFF_NAT_import_20221031.csv")
+write_csv(df_final, "Data/q4_prep/FY22Q4_HRH_STAFF_NAT_import_20221102.csv")
+
+
+
+# QC with MSD -------------------------------------------------------------------
+SA_MSD<-gophr:: read_msd("C:/Users/jstephens/Documents/South Africa/DMR/MER/MER/Data/q4_prep/MER_Structured_Datasets_Site_IM_FY20-23_20220916_v2_2_South Africa.txt")%>% 
+  filter(indicator == "HRH_STAFF_NAT") %>% 
+  
+SA_MSD_munge<-SA_MSD %>% 
+  filter(fiscal_year == "2021",standardizeddisaggregate=="CadreCategory" ) %>% 
+    select(sitename, qtr4, otherdisaggregate)
+
+df_msd_qc <- df_final %>%
+  left_join(SA_MSD_munge, by = c("OrgUnit" = "sitename", "cat"="otherdisaggregate")) %>% 
+  rename(FY21Q4=qtr4) %>% 
+  mutate( dif=FY21Q4-value)
+
+write_csv(df_msd_qc, "Data/q4_prep/FY22Q4_HRH_STAFF_NAT_import_20221102_MSDcomparison.csv")
